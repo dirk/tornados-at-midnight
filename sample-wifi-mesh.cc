@@ -8,6 +8,7 @@
 #include "ns3/olsr-helper.h"
 #include "ns3/ipv4-static-routing-helper.h"
 #include "ns3/ipv4-list-routing-helper.h"
+#include "ns3/olsr-header.h"
 
 #include <iostream>
 #include <fstream>
@@ -34,6 +35,55 @@ int lookupIpv4Index(Ipv4Address needle) {
   return -1;
 }
 
+Ipv4Header getIpv4Header(Ptr<const Packet> p) {
+  Ipv4Header ipv4Header;
+  Ptr<Packet> packet = p->Copy();
+  PacketMetadata::ItemIterator metadataIterator = packet->BeginItem();
+  PacketMetadata::Item item;
+  while (metadataIterator.HasNext()) {
+    item = metadataIterator.Next();
+    if(item.tid.GetName() == "ns3::Ipv4Header") {
+      ipv4Header.Deserialize(item.current);
+      return ipv4Header;
+    }
+  }
+  return ipv4Header;
+}
+
+void MacSendTrace(std::string context, Ptr<const Packet> p) {
+  Ipv4Header header = getIpv4Header(p);
+  std::ostringstream log;
+  int ri = lookupIpv4Index(header.GetDestination());
+  int si = lookupIpv4Index(header.GetSource());
+  log << Simulator::Now().GetMicroSeconds() << ",mac-send," << si << "," << ri;
+  PLLogWrite(log.str());
+}
+void MacRecvTrace(std::string context, Ptr<const Packet> p) {
+  Ipv4Header header = getIpv4Header(p);
+  std::ostringstream log;
+  int ri = lookupIpv4Index(header.GetDestination());
+  int si = lookupIpv4Index(header.GetSource());
+  log << Simulator::Now().GetMicroSeconds() << ",mac-recv," << si << "," << ri;
+  PLLogWrite(log.str());
+}
+
+void PhySendTrace(std::string context, Ptr<const Packet> p) {
+  Ipv4Header header = getIpv4Header(p);
+  std::ostringstream log;
+  int ri = lookupIpv4Index(header.GetDestination());
+  int si = lookupIpv4Index(header.GetSource());
+  log << Simulator::Now().GetMicroSeconds() << ",phy-send," << si << "," << ri;
+  PLLogWrite(log.str());
+}
+void PhyRecvTrace(std::string context, Ptr<const Packet> p) {
+  Ipv4Header header = getIpv4Header(p);
+  std::ostringstream log;
+  int ri = lookupIpv4Index(header.GetDestination());
+  int si = lookupIpv4Index(header.GetSource());
+  log << Simulator::Now().GetMicroSeconds() << ",phy-recv," << si << "," << ri;
+  PLLogWrite(log.str());
+}
+
 void ReceivePacket(Ptr<Socket> socket) {
   Ptr<Packet> packet;
   while ((packet = socket->Recv())) {
@@ -49,7 +99,7 @@ void ReceivePacket(Ptr<Socket> socket) {
       InetSocketAddress sendAddress = InetSocketAddress::ConvertFrom(tag.GetAddress());
       int ri = lookupIpv4Index(recvAddress.GetIpv4());
       int si = lookupIpv4Index(sendAddress.GetIpv4());
-      log << Simulator::Now().GetSeconds() << ",recv," << si << "," << ri;
+      log << Simulator::Now().GetMicroSeconds() << ",udp-recv," << si << "," << ri;
     } else {
       log << "err,Packet recieved without tags";
     }
@@ -73,7 +123,7 @@ void SendPacket(uint32_t size, uint32_t count, Time interval) {
     socket->Send(Create<Packet>(size));
     socket->Close();
     
-    PLLogWrite(Simulator::Now().GetSeconds() << ",send," << si << "," << di);
+    PLLogWrite(Simulator::Now().GetMicroSeconds() << ",udp-send," << si << "," << di);
     Simulator::Schedule(interval, &SendPacket, size, count - 1, interval);
   } else {
     Simulator::Stop();
@@ -81,7 +131,9 @@ void SendPacket(uint32_t size, uint32_t count, Time interval) {
 }
 
 int PSWifiMesh() {
-  // Packet::EnablePrinting();
+  Packet::EnablePrinting();
+  Packet::EnableChecking();
+  Time::SetResolution(Time::NS);
   
   // CONFIGURATION ------------------------------------------------------------
   
@@ -169,8 +221,15 @@ int PSWifiMesh() {
   PLLogWrite(""); // Empty line between sections.
   
   // Give OLSR time to converge before starting packet sending.
-  PLLogWrite(Simulator::Now().GetSeconds() << ",notice,OLSR converging");
+  PLLogWrite(Simulator::Now().GetMicroSeconds() << ",notice,OLSR converging");
   Simulator::Schedule(Seconds(30.0), &SendPacket, packetSize, numPackets, packetInterval);
+  
+  // Tracing at network layer.
+  Config::Connect("/NodeList/*/DeviceList/*/Mac/MacTx", MakeCallback(&MacSendTrace));
+  Config::Connect("/NodeList/*/DeviceList/*/Mac/MacRx", MakeCallback(&MacRecvTrace));
+  // Tracing at physical layer.
+  Config::Connect("/NodeList/*/DeviceList/*/Phy/PhyTxBegin", MakeCallback(&PhySendTrace));
+  Config::Connect("/NodeList/*/DeviceList/*/Phy/PhyRxBegin", MakeCallback(&PhyRecvTrace));
   
   Simulator::Stop(Seconds(120.0));
   Simulator::Run();
