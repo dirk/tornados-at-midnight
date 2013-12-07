@@ -1,4 +1,4 @@
-#include "lib-all.h"
+#include "lib.h"
 
 #include "ns3/network-module.h"
 #include "ns3/mobility-module.h"
@@ -15,10 +15,6 @@
 
 using namespace ns3;
 
-int my_rand(int max) {
-  return (rand() % (int)(max));
-}
-
 // All the nodes that we'll be using.
 const uint32_t nodeCount = 5;
 Ptr<Socket> sockets[nodeCount];
@@ -27,59 +23,40 @@ const int port = 80;
 static NodeContainer container;
 static Ipv4InterfaceContainer ipv4container;
 
-int lookupIpv4Index(Ipv4Address needle) {
-  for(uint32_t idx = 0; idx < nodeCount; idx++) {
-    Ipv4Address ip = ipv4container.GetAddress(idx, 0);
-    if(ip.IsEqual(needle)) { return int(idx); }
-  }
-  return -1;
-}
 
-Ipv4Header getIpv4Header(Ptr<const Packet> p) {
-  Ipv4Header ipv4Header;
-  Ptr<Packet> packet = p->Copy();
-  PacketMetadata::ItemIterator metadataIterator = packet->BeginItem();
-  PacketMetadata::Item item;
-  while (metadataIterator.HasNext()) {
-    item = metadataIterator.Next();
-    if(item.tid.GetName() == "ns3::Ipv4Header") {
-      ipv4Header.Deserialize(item.current);
-      return ipv4Header;
-    }
-  }
-  return ipv4Header;
-}
+
+
 
 void MacSendTrace(std::string context, Ptr<const Packet> p) {
-  Ipv4Header header = getIpv4Header(p);
+  Ipv4Header header = GetIpv4Header(p);
   std::ostringstream log;
-  int ri = lookupIpv4Index(header.GetDestination());
-  int si = lookupIpv4Index(header.GetSource());
+  int ri = PLLookupIpv4IndexInContainer(header.GetDestination(), ipv4container, nodeCount);
+  int si = PLLookupIpv4IndexInContainer(header.GetSource(),      ipv4container, nodeCount);
   log << Simulator::Now().GetMicroSeconds() << ",mac-send," << si << "," << ri;
   PLLogWrite(log.str());
 }
 void MacRecvTrace(std::string context, Ptr<const Packet> p) {
-  Ipv4Header header = getIpv4Header(p);
+  Ipv4Header header = GetIpv4Header(p);
   std::ostringstream log;
-  int ri = lookupIpv4Index(header.GetDestination());
-  int si = lookupIpv4Index(header.GetSource());
+  int ri = PLLookupIpv4IndexInContainer(header.GetDestination(), ipv4container, nodeCount);
+  int si = PLLookupIpv4IndexInContainer(header.GetSource(),      ipv4container, nodeCount);
   log << Simulator::Now().GetMicroSeconds() << ",mac-recv," << si << "," << ri;
   PLLogWrite(log.str());
 }
 
 void PhySendTrace(std::string context, Ptr<const Packet> p) {
-  Ipv4Header header = getIpv4Header(p);
+  Ipv4Header header = GetIpv4Header(p);
   std::ostringstream log;
-  int ri = lookupIpv4Index(header.GetDestination());
-  int si = lookupIpv4Index(header.GetSource());
+  int ri = PLLookupIpv4IndexInContainer(header.GetDestination(), ipv4container, nodeCount);
+  int si = PLLookupIpv4IndexInContainer(header.GetSource(),      ipv4container, nodeCount);
   log << Simulator::Now().GetMicroSeconds() << ",phy-send," << si << "," << ri;
   PLLogWrite(log.str());
 }
 void PhyRecvTrace(std::string context, Ptr<const Packet> p) {
-  Ipv4Header header = getIpv4Header(p);
+  Ipv4Header header = GetIpv4Header(p);
   std::ostringstream log;
-  int ri = lookupIpv4Index(header.GetDestination());
-  int si = lookupIpv4Index(header.GetSource());
+  int ri = PLLookupIpv4IndexInContainer(header.GetDestination(), ipv4container, nodeCount);
+  int si = PLLookupIpv4IndexInContainer(header.GetSource(),      ipv4container, nodeCount);
   log << Simulator::Now().GetMicroSeconds() << ",phy-recv," << si << "," << ri;
   PLLogWrite(log.str());
 }
@@ -97,8 +74,9 @@ void ReceivePacket(Ptr<Socket> socket) {
       socket->GetSockName(addr);
       InetSocketAddress recvAddress = InetSocketAddress::ConvertFrom(addr);
       InetSocketAddress sendAddress = InetSocketAddress::ConvertFrom(tag.GetAddress());
-      int ri = lookupIpv4Index(recvAddress.GetIpv4());
-      int si = lookupIpv4Index(sendAddress.GetIpv4());
+      
+      int ri = PLLookupIpv4IndexInContainer(recvAddress.GetIpv4(), ipv4container, nodeCount);
+      int si = PLLookupIpv4IndexInContainer(sendAddress.GetIpv4(), ipv4container, nodeCount);
       log << Simulator::Now().GetMicroSeconds() << ",udp-recv," << si << "," << ri;
     } else {
       log << "err,Packet recieved without tags";
@@ -110,8 +88,8 @@ void ReceivePacket(Ptr<Socket> socket) {
 void SendPacket(uint32_t size, uint32_t count, Time interval) {
   if(count > 0) {
     // Pick a random sender and destination for a packet.
-    int si = my_rand(nodeCount);
-    int di = my_rand(nodeCount); while(di == si) { di = my_rand(nodeCount); }
+    int si = PLRandInt(nodeCount);
+    int di = PLRandInt(nodeCount); while(di == si) { di = PLRandInt(nodeCount); }
     
     TypeId tid = TypeId::LookupByName("ns3::UdpSocketFactory");
     Ptr<Socket> socket = Socket::CreateSocket(container.Get(si), tid);
@@ -150,33 +128,15 @@ int PSWifiMesh() {
   // Nodes for sending and receiving.
   //uint32_t recvNode   = 0;
   //uint32_t sendNode = 4;
-  // What rate should the system be sending at.
-  std::string physicalMode = "DsssRate1Mbps";
   
   // RUNNING ------------------------------------------------------------------
   
   // Holds all the network nodes.
   container.Create(nodeCount);
-  
-  WifiHelper wifi;
-  // Set constant rate.
-  wifi.SetStandard(WIFI_PHY_STANDARD_80211b);
-  wifi.SetRemoteStationManager(
-    "ns3::ConstantRateWifiManager",
-    "DataMode", StringValue(physicalMode),
-    "ControlMode", StringValue(physicalMode)
-  );
-  
-  // Helper for setting up physical network.
-  YansWifiPhyHelper phys = YansWifiPhyHelper::Default();
-  phys.Set("RxGain", DoubleValue(-10));
-  // 802.11b
-  phys.SetPcapDataLinkType (YansWifiPhyHelper::DLT_IEEE802_11_RADIO);
-    // Setting up the wifi channel for the physical layer.
-    YansWifiChannelHelper channel;
-    channel.SetPropagationDelay ("ns3::ConstantSpeedPropagationDelayModel");
-    channel.AddPropagationLoss ("ns3::FriisPropagationLossModel");
-    phys.SetChannel(channel.Create());
+  // Set up overall wifi structure.
+  WifiHelper wifi = PLCreateWifiHelper("DsssRate1Mbps");
+  // Then build the physical network.
+  YansWifiPhyHelper phys = PLCreateWifiPhysicalHelper();
     
   NqosWifiMacHelper mac = NqosWifiMacHelper::Default();
   mac.SetType("ns3::AdhocWifiMac");
