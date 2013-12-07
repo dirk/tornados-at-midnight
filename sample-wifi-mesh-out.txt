@@ -3,6 +3,26 @@ node,1
 node,2
 node,3
 node,4
+link,0,1,1Mbps,,wireless,
+link,0,2,1Mbps,,wireless,
+link,0,3,1Mbps,,wireless,
+link,0,4,1Mbps,,wireless,
+link,1,0,1Mbps,,wireless,
+link,1,2,1Mbps,,wireless,
+link,1,3,1Mbps,,wireless,
+link,1,4,1Mbps,,wireless,
+link,2,0,1Mbps,,wireless,
+link,2,1,1Mbps,,wireless,
+link,2,3,1Mbps,,wireless,
+link,2,4,1Mbps,,wireless,
+link,3,0,1Mbps,,wireless,
+link,3,1,1Mbps,,wireless,
+link,3,2,1Mbps,,wireless,
+link,3,4,1Mbps,,wireless,
+link,4,0,1Mbps,,wireless,
+link,4,1,1Mbps,,wireless,
+link,4,2,1Mbps,,wireless,
+link,4,3,1Mbps,,wireless,
 
 0,notice,OLSR converging
 17094,mac-send,2,-1

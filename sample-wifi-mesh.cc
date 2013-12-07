@@ -127,13 +127,14 @@ int PSWifiMesh() {
   uint32_t packetSize = 500; // Bytes
   // Number of packets to generate.
   uint32_t numPackets = 100;
+  std::string rate = "1Mbps";
   
   // RUNNING ------------------------------------------------------------------
   
   // Holds all the network nodes.
   container.Create(nodeCount);
   // Set up overall wifi structure.
-  WifiHelper wifi = PLCreateWifiHelper("DsssRate1Mbps");
+  WifiHelper wifi = PLCreateWifiHelper("DsssRate" + rate);
   // Then build the physical network.
   YansWifiPhyHelper phys = PLCreateWifiPhysicalHelper();
   NqosWifiMacHelper mac = NqosWifiMacHelper::Default();
@@ -176,6 +177,13 @@ int PSWifiMesh() {
     InetSocketAddress local = InetSocketAddress(ipv4container.GetAddress(idx, 0), port);
     sockets[idx]->Bind(local);
     sockets[idx]->SetRecvCallback(MakeCallback(&UDPReceivePacket));
+  }
+  for(uint32_t c1 = 0; c1 < nodeCount; c1++) {
+    for(uint32_t c2 = 0; c2 < nodeCount; c2++) {
+      if(c1 != c2) {
+        PLLogWrite("link," << c1 << "," << c2 << "," << rate << ",,wireless,");
+      }
+    }
   }
   PLLogWrite(""); // Empty line between sections.
   
