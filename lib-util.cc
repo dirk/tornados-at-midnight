@@ -11,3 +11,10 @@ int PLLookupIpv4IndexInContainer(ns3::Ipv4Address needle, ns3::Ipv4InterfaceCont
   }
   return -1;
 }
+
+double VectorDistance(ns3::Vector v1, ns3::Vector v2) {
+  double dx = v1.x - v2.x;
+  double dy = v1.y - v2.y;
+  double d  = sqrt((dx * dx) + (dy * dy));
+  return d;
+}

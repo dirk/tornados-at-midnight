@@ -28,3 +28,10 @@ ns3::YansWifiPhyHelper PLCreateWifiPhysicalHelper() {
     phys.SetChannel(channel.Create());
   return phys;
 }
+
+// Get position of a node.
+ns3::Vector GetNodePosition(ns3::Ptr<ns3::Node> node, ns3::NodeContainer container) {
+  ns3::Ptr<ns3::MobilityModel> mob = node->GetObject<ns3::MobilityModel>();
+  ns3::Vector pos = mob->GetPosition();
+  return pos;
+}

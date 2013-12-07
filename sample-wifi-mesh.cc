@@ -181,7 +181,14 @@ int PSWifiMesh() {
   for(uint32_t c1 = 0; c1 < nodeCount; c1++) {
     for(uint32_t c2 = 0; c2 < nodeCount; c2++) {
       if(c1 != c2) {
-        PLLogWrite("link," << c1 << "," << c2 << "," << rate << ",,wireless,");
+        // Calculate distance between nodes (meters).
+        Ptr<Node> c1Node = container.Get(c1);
+        Vector c1Pos = GetNodePosition(c1Node, container);
+        Ptr<Node> c2Node = container.Get(c2);
+        Vector c2Pos = GetNodePosition(c2Node, container);
+        double d = VectorDistance(c1Pos, c2Pos);
+        double dProp = (d / C) * 1000000000; // Nanoseconds
+        PLLogWrite("link," << c1 << "," << c2 << "," << rate << "," << dProp << "ns,wireless,");
       }
     }
   }
