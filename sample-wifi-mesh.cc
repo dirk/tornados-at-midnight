@@ -19,11 +19,12 @@ using namespace ns3;
 const uint32_t nodeCount = 5;
 Ptr<Socket> sockets[nodeCount];
 
+// UDP port to send-receive on.
 const int port = 80;
+// Container for nodes in network.
 static NodeContainer container;
+// Container for IPv4-to-node mappings.
 static Ipv4InterfaceContainer ipv4container;
-
-
 
 // Network layer tracing ------------------------------------------------------
 void MacSendTrace(std::string context, Ptr<const Packet> p) {
@@ -91,16 +92,17 @@ void UDPSendPacket(uint32_t size, uint32_t count, Time interval) {
     int si = PLRandInt(nodeCount);
     int di = PLRandInt(nodeCount); while(di == si) { di = PLRandInt(nodeCount); }
     
+    // Create sending socket.
     TypeId tid = TypeId::LookupByName("ns3::UdpSocketFactory");
     Ptr<Socket> socket = Socket::CreateSocket(container.Get(si), tid);
-    
+    // Get address for receiver.
     Ipv4Address       destAddress       = ipv4container.GetAddress(di, 0);
     InetSocketAddress destSocketAddress = InetSocketAddress(destAddress, port);
-    
+    // Connect and send the packet.
     socket->Connect(destSocketAddress);
     socket->Send(Create<Packet>(size));
     socket->Close();
-    
+    // Log the send then wait `interval` time before sending another random packet.
     PLLogWrite(Simulator::Now().GetMicroSeconds() << ",udp-send," << si << "," << di);
     Simulator::Schedule(interval, &UDPSendPacket, size, count - 1, interval);
   } else {
@@ -166,6 +168,7 @@ int PSWifiMesh() {
   ipv4.SetBase ("10.1.1.0", "255.255.255.0");
   ipv4container = ipv4.Assign(devices);
   
+  // Create receive sockets for all of the nodes in the network.
   TypeId tid = TypeId::LookupByName("ns3::UdpSocketFactory");
   for(uint32_t idx = 0; idx < nodeCount; idx++) {
     PLLogWrite("node," << idx);
@@ -180,10 +183,10 @@ int PSWifiMesh() {
   PLLogWrite(Simulator::Now().GetMicroSeconds() << ",notice,OLSR converging");
   Simulator::Schedule(Seconds(30.0), &UDPSendPacket, packetSize, numPackets, packetInterval);
   
-  // Tracing at network layer.
+  // Set up tracing at network layer.
   Config::Connect("/NodeList/*/DeviceList/*/Mac/MacTx", MakeCallback(&MacSendTrace));
   Config::Connect("/NodeList/*/DeviceList/*/Mac/MacRx", MakeCallback(&MacRecvTrace));
-  // Tracing at physical layer.
+  // And also at the physical layer.
   Config::Connect("/NodeList/*/DeviceList/*/Phy/PhyTxBegin", MakeCallback(&PhySendTrace));
   Config::Connect("/NodeList/*/DeviceList/*/Phy/PhyRxBegin", MakeCallback(&PhyRecvTrace));
   
