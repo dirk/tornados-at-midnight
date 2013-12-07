@@ -1,5 +1,7 @@
 #include "lib.h"
 
+// Create a Wifi networ helper with give data rate.
+// rate: eg. "DsssRate1Mbps"
 ns3::WifiHelper PLCreateWifiHelper(std::string rate) {
   ns3::WifiHelper wifi;
   // Set constant rate.
@@ -11,6 +13,9 @@ ns3::WifiHelper PLCreateWifiHelper(std::string rate) {
   );
   return wifi;
 }
+
+// Returns a physical layer helper for Wifi networks.
+// Has default gain of -10 dB and IEEE 802.11.
 ns3::YansWifiPhyHelper PLCreateWifiPhysicalHelper() {
   ns3::YansWifiPhyHelper phys = ns3::YansWifiPhyHelper::Default();
   phys.Set("RxGain", ns3::DoubleValue(-10));

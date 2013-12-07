@@ -25,8 +25,7 @@ static Ipv4InterfaceContainer ipv4container;
 
 
 
-
-
+// Network layer tracing ------------------------------------------------------
 void MacSendTrace(std::string context, Ptr<const Packet> p) {
   Ipv4Header header = GetIpv4Header(p);
   std::ostringstream log;
@@ -44,6 +43,7 @@ void MacRecvTrace(std::string context, Ptr<const Packet> p) {
   PLLogWrite(log.str());
 }
 
+// Physical layer tracing -----------------------------------------------------
 void PhySendTrace(std::string context, Ptr<const Packet> p) {
   Ipv4Header header = GetIpv4Header(p);
   std::ostringstream log;
@@ -61,7 +61,8 @@ void PhyRecvTrace(std::string context, Ptr<const Packet> p) {
   PLLogWrite(log.str());
 }
 
-void ReceivePacket(Ptr<Socket> socket) {
+// Application layer tracing --------------------------------------------------
+void UDPReceivePacket(Ptr<Socket> socket) {
   Ptr<Packet> packet;
   while ((packet = socket->Recv())) {
     bool found;
@@ -84,8 +85,7 @@ void ReceivePacket(Ptr<Socket> socket) {
     PLLogWrite(log.str());
   }
 }
-
-void SendPacket(uint32_t size, uint32_t count, Time interval) {
+void UDPSendPacket(uint32_t size, uint32_t count, Time interval) {
   if(count > 0) {
     // Pick a random sender and destination for a packet.
     int si = PLRandInt(nodeCount);
@@ -102,7 +102,7 @@ void SendPacket(uint32_t size, uint32_t count, Time interval) {
     socket->Close();
     
     PLLogWrite(Simulator::Now().GetMicroSeconds() << ",udp-send," << si << "," << di);
-    Simulator::Schedule(interval, &SendPacket, size, count - 1, interval);
+    Simulator::Schedule(interval, &UDPSendPacket, size, count - 1, interval);
   } else {
     Simulator::Stop();
   }
@@ -125,9 +125,6 @@ int PSWifiMesh() {
   uint32_t packetSize = 500; // Bytes
   // Number of packets to generate.
   uint32_t numPackets = 100;
-  // Nodes for sending and receiving.
-  //uint32_t recvNode   = 0;
-  //uint32_t sendNode = 4;
   
   // RUNNING ------------------------------------------------------------------
   
@@ -137,10 +134,9 @@ int PSWifiMesh() {
   WifiHelper wifi = PLCreateWifiHelper("DsssRate1Mbps");
   // Then build the physical network.
   YansWifiPhyHelper phys = PLCreateWifiPhysicalHelper();
-    
   NqosWifiMacHelper mac = NqosWifiMacHelper::Default();
   mac.SetType("ns3::AdhocWifiMac");
-  
+  // Install the physical and network layer Wifi helpers.
   NetDeviceContainer devices = wifi.Install(phys, mac, container);
   
   // Use the mobility helper to set up the grid.
@@ -176,13 +172,13 @@ int PSWifiMesh() {
     sockets[idx] = Socket::CreateSocket(container.Get(idx), tid);
     InetSocketAddress local = InetSocketAddress(ipv4container.GetAddress(idx, 0), port);
     sockets[idx]->Bind(local);
-    sockets[idx]->SetRecvCallback(MakeCallback(&ReceivePacket));
+    sockets[idx]->SetRecvCallback(MakeCallback(&UDPReceivePacket));
   }
   PLLogWrite(""); // Empty line between sections.
   
   // Give OLSR time to converge before starting packet sending.
   PLLogWrite(Simulator::Now().GetMicroSeconds() << ",notice,OLSR converging");
-  Simulator::Schedule(Seconds(30.0), &SendPacket, packetSize, numPackets, packetInterval);
+  Simulator::Schedule(Seconds(30.0), &UDPSendPacket, packetSize, numPackets, packetInterval);
   
   // Tracing at network layer.
   Config::Connect("/NodeList/*/DeviceList/*/Mac/MacTx", MakeCallback(&MacSendTrace));
